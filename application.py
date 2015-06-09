@@ -6,7 +6,7 @@ from flask import session as login_session
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
 
-from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
+from oauth2client.client import flow_from_clientsecrets, FlowExchangeError, AccessTokenCredentials
 
 from database_setup import Base, User, Category, Item
 
@@ -45,7 +45,7 @@ def getUserID(email):
 @app.route('/login')
 def showLogin():
     """
-    Show login page
+    Show login page and generate session.
     """
     state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
     login_session['state'] = state
@@ -55,12 +55,18 @@ def showLogin():
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     """
+    Authenticate through Google OAuth API function.
+    Get post-request object.
+    Return HTML with callback JS function
     """
+    # Validate state token
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
+
     code = request.data
+
     try:
         # Upgrade authorization code into credentials object
         oauth_flow = flow_from_clientsecrets('client_secret.json', scope='')
@@ -70,35 +76,46 @@ def gconnect():
         response = make_response(json.dumps('Failed to upgrade the authorization code.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
+
     access_token = credentials.access_token
     url = ('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s' % access_token)
     h = httplib2.Http()
     result = json.loads(h.request(url, 'GET')[1])
+
     # If there was an error  in the access token info, abort
     if result.get('error') is not None:
         response = make_response(json.dumps(result.get('error')), 500)
         response.headers['Content-Type'] = 'application/json'
+
     # Verify that the access token is used for the intended user
     gplus_id = credentials.id_token['sub']
+
     if result['user_id'] != gplus_id:
         response = make_response(json.dumps("Token's user ID doesn't match given user ID."), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
+
     # Verify that the access token is valid for this app
     if result['issued_to'] != CLIENT_ID:
         response = make_response(json.dumps("Token's client ID doesn't match app's."), 401)
         print("Token's client ID doesn't match app's.")
         response.headers['Content-Type'] = 'application/json'
         return response
+
     # Check to see if user is already logged in
     stored_credentials = login_session.get('credentials')
     stored_gplus_id = login_session.get('gplus_id')
+
     if stored_credentials is not None and gplus_id == stored_gplus_id:
         response = make_response(json.dumps('Current user is already connected.'), 200)
         response.headers['Content-Type'] = 'application/json'
+
     # Store access token in session for later use
-    login_session['credentials'] = credentials
+    # Store just token (for resolve JSON error bug in Flask)
+    login_session['credentials'] = credentials.access_token
     login_session['gplus_id'] = gplus_id
+    # Get credentials from session
+    credentials = AccessTokenCredentials(login_session['credentials'], 'user-agent-value')
     login_session['provider'] = 'google'
     # Get user info
     userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
@@ -106,28 +123,56 @@ def gconnect():
     answer = requests.get(userinfo_url, params=params)
     data = json.loads(answer.text)
     login_session['username'] = data['name']
-    # TODO: stopped here
-    if data['email'] != '':
-        login_session['email'] = data['email']
-    user_id = getUserID(login_session['email'])
-    if not user_id:
-        user_id = createUser(login_session)
-    login_session['user_id'] = user_id
+    # if data['email'] != '':
+    #     login_session['email'] = data['email']
+    # user_id = getUserID(login_session['email'])
+    # if not user_id:
+    #     user_id = createUser(login_session)
+    # login_session['user_id'] = user_id
+    login_session['email'] = data['email']
     output = ''
     output += '<h1>Welcome, '
     output += login_session['username']
     output += '!</h1>'
-    output += '<img src="'
-    output += login_session['picture']
-    output += '" style="width: 300px; height: 300px; border-radius: 150px; -webkit-border-radius: 150px; -moz-border-radius: 150px;">'
-    flash("You are now logged in as %s" % login_session['username'])
+    # output += '<img src="'
+    # output += login_session['picture']
+    # output += '" style="width: 300px; height: 300px; border-radius: 150px; -webkit-border-radius: 150px; -moz-border-radius: 150px;">'
+    # flash("You are now logged in as %s" % login_session['username'])
     return output
 
 
 @app.route('/gdisconnect')
 def gdisconnect():
-    return "Logoff google oauth"
+    """
+    Revoke user token and reset login_session
+    """
 
+    # Use AccessTokenCredentials for fix bug in Flask
+    credentials = AccessTokenCredentials(login_session['credentials'], 'user-agent-value')
+    if credentials is None:
+        response = make_response(json.dumps("Current user not connected."), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    #Execute HTTP GET to revoke token
+    access_token = credentials.access_token
+    url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' % access_token
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[0]
+
+    if result['status'] == '200':
+        # Reset the user's session
+        del login_session['credentials']
+        del login_session['gplus_id']
+        del login_session['username']
+        del login_session['email']
+        response = make_response(json.dumps('Successfully disconnected!'), 200)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    else:
+        response = make_response(json.dumps('Failed to revoke token for given user'), 400)
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
 @app.route('/fbconnect')
 def fbconnect():
@@ -198,6 +243,12 @@ def showItems(category_name):
 def showItem(category_name, item_name):
     return "Show one item in category"
 
+
+@app.route('/catalog/add')
+def addItem():
+    if 'username' not in login_session:
+        return redirect('/login')
+    return "Add item page."
 
 @app.route('/catalog/<string:item_name>/edit')
 def editItem(item_name):

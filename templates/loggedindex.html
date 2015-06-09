@@ -1,10 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head lang="en">
-    <meta charset="UTF-8">
-    <title></title>
-</head>
-<body>
-
-</body>
-</html>
+{% extends "main.html" %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-xs-4">
+            <h1>Categories</h1>
+            {% for category in categories %}
+                <p><a href="#">{{ category.name }}</a></p>
+            {% endfor %}
+        </div>
+        <div class="col-xs-8">
+            <h1>Latest Items</h1>
+            {% for item in items %}
+                <p><a href="#">{{ item.name }} {{ item.category }}</a></p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
