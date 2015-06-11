@@ -9,6 +9,17 @@
     <script src="{{ url_for('static', filename='js/jquery-2.1.1.min.js') }}"></script>
 </head>
 <body>
+    <div class="container">
+        <div class="row">
+            <div class="col-xs-12">
+                {% if 'username' not in session %}
+                    <a href="{{ url_for('showLogin') }}">Login</a>
+                {% else %}
+                    <a href="{{ url_for('disconnect') }}">Logout</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
     {% block content %}
     {% endblock %}
 </body>

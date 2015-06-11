@@ -26,35 +26,93 @@
     <div id="result">
         <script>
             function signInCallback(authResult) {
-            if (authResult['code']) {
-                // Hide the sign-in button
-                $('#signInButton').attr('style', 'display: none');
-
-                // Send the ne-time-use code to the server, if server responds, write 'login successful; message to the
-                // web page and then redirect back to the main restaurants page
-                $.ajax({
-                    type: 'POST',
-                    url: '/gconnect?state={{ STATE }}',
-                    processData: false,
-                    data: authResult['code'],
-                    contentType: 'application/octet-stream; charset=utf-8',
-                    success: function (result) {
-                        // Handle or verify the server response if necessary
-                        if (result) {
-                            $('#result').html('Login successful!<br>' + result + '</br>Redirecting...');
-                            setTimeout(function () {
-                                window.location.href = "/";
-                            }, 4000);
-                        } else if (authResult['error']) {
-                            console.log('There was an error: ' + authResult['error']);
-                        } else {
-                            $('#result').html('Failed to make a server-side call. Check your configuration and console.');
+                if (authResult['code']) {
+                    // Hide the sign-in button
+                    $('#signInButton').attr('style', 'display: none');
+                    // Send the ne-time-use code to the server, if server responds, write 'login successful; message to the
+                    // web page and then redirect back to the main restaurants page
+                    $.ajax({
+                        type: 'POST',
+                        url: '/gconnect?state={{ STATE }}',
+                        processData: false,
+                        data: authResult['code'],
+                        contentType: 'application/octet-stream; charset=utf-8',
+                        success: function (result) {
+                            // Handle or verify the server response if necessary
+                            if (result) {
+                                $('#result').html('Login successful!<br>' + result + '</br>Redirecting...');
+                                setTimeout(function () {
+                                    window.location.href = "/";
+                                }, 4000);
+                            } else if (authResult['error']) {
+                                console.log('There was an error: ' + authResult['error']);
+                            } else {
+                                $('#result').html('Failed to make a server-side call. Check your configuration and console.');
+                            }
                         }
-                    }
+                    });
+                }
+            }
+        </script>
+        <!-- FACEBOOK SIGN IN -->
+        <script>
+            window.fbAsyncInit = function() {
+                FB.init({
+                    appId: '461498984012243',
+                    cookie: true,  // enable cookies to allow the server to access the session
+                    xfbml: true,  // parse social plugins on this page
+                    version: 'v2.2' // use version 2.2
+                });
+            };
+
+            // Load the SDK asynchronously
+            (function(d, s, id) {
+                var js, fjs = d.getElementsByTagName(s)[0];
+                if (d.getElementById(id)) return;
+                js = d.createElement(s); js.id = id;
+                js.src = "//connect.facebook.net/en_US/sdk.js";
+                fjs.parentNode.insertBefore(js, fjs);
+            }(document, 'script', 'facebook-jssdk'));
+
+            function sendTokenToServer() {
+                var access_token = FB.getAuthResponse()['accessToken'];
+                console.log(access_token);
+                console.log('Welcome! Fetching your information...')
+                FB.api('/me', function (response) {
+                    console.log('Successful login for: ' + response.name);
+                    $.ajax({
+                        type: 'POST',
+                        url: '/fbconnect?state={{ STATE }}',
+                        processData: false,
+                        data: access_token,
+                        contentType: 'application/octet-stream; charset=utf-8',
+                        success: function (result){
+                            // Handle server response
+                            if (result) {
+                                $('#result').html('Login successful! <br>' + result + '<br> Redirecting...')
+                                setTimeout(function() {
+                                    window.location.href = "/";
+                                }, 4000);
+                            } else {
+                                $('#result').html('Failed to make a server-side call. Check your configuration and console.')
+                            }
+                        }
+                    });
                 });
             }
-        }
         </script>
+<!--
+  Below we include the Login Button social plugin. This button uses
+  the JavaScript SDK to present a graphical Login button that triggers
+  the FB.login() function when clicked.
+-->
+        <button>
+            <fb:login-button scope="public_profile,email" onlogin="sendTokenToServer();">
+                <a href='javascript:sendTokenToServer()'>Login with Facebook</a>
+            </fb:login-button>
+        </button>
+    </div>
+    <div id="status">
     </div>
 </body>
 </html>
