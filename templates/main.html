@@ -3,22 +3,31 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title></title>
+    <script src="{{ url_for('static', filename='js/jquery-2.1.1.min.js') }}"></script>
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ url_for('static', filename='css/bootstrap-theme.min.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" type="text/css">
     <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/jquery-2.1.1.min.js') }}"></script>
+
 </head>
 <body>
-    <div class="container">
-        <div class="row">
-            <div class="col-xs-12">
-                {% if 'username' not in session %}
-                    <a href="{{ url_for('showLogin') }}">Login</a>
-                {% else %}
-                    <a href="{{ url_for('disconnect') }}">Logout</a>
-                {% endif %}
+    <div class="container" id="headerline">
+        <div class="row login"></div>
+        <div class="container">
+            <div class="row">
+                <div class="col-xs-8">
+                    <h1 class="main_h1">Catalog App</h1>
+                </div>
+                <div class="col-xs-4" >
+                    {% if 'username' not in session %}
+                        <a href="{{ url_for('showLogin') }}" class="btn btn-danger">Login</a>
+                    {% else %}
+                        <a href="{{ url_for('disconnect') }}" class="btn btn-danger">Logout</a>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        <div class="row login"></div>
     </div>
     {% block content %}
     {% endblock %}

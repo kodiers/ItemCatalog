@@ -1,0 +1,23 @@
+#errors {
+    color: red;
+}
+
+#headerline {
+    background-color: #001a43;
+    height: 80px;
+    width: 100%;
+}
+.login {
+    height: 25px;
+}
+.main_h1 {
+    color: #ffffff;
+    font-size: 32px;
+    margin-top: 0px;
+}
+.main_col {
+    text-align: center;
+}
+.pages_h1 {
+    color: #001a43;
+}

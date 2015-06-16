@@ -1,0 +1,18 @@
+{% extends "main.html" %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-xs-8">
+            <h1>Delete item {{ item.name }}?</h1>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-8">
+            <div id="errors"></div>
+            <form action="#" method="post">
+                <button type="submit" value="Submit" class="btn btn-default">Submit</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

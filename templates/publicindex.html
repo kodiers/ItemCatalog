@@ -3,15 +3,15 @@
 <div class="container">
     <div class="row">
         <div class="col-xs-4">
-            <h1>Categories</h1>
+            <h1 class="pages_h1">Categories</h1>
             {% for category in categories %}
-                <p><a href="#">{{ category.name }}</a></p>
+                <p><a href="{{ url_for('showItems', category_name=category.name) }}">{{ category.name }}</a></p>
             {% endfor %}
         </div>
         <div class="col-xs-8">
-            <h1>Latest Items</h1>
+            <h1 class="pages_h1">Latest Items</h1>
             {% for item in items %}
-                <p><a href="#">{{ item.name }} {{ item.category }}</a></p>
+                <p><a href="{{ url_for('showItem', category_name=item.category.name, item_name=item.name) }}">{{ item.name }} {{ item.category.name }}</a></p>
             {% endfor %}
         </div>
     </div>

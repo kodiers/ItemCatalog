@@ -277,7 +277,23 @@ def categoryJSON(category_id):
 
 @app.route('/category/JSON/items/')
 def itemsJSON():
-    return "All items as JSON"
+    """
+
+    :return:
+    """
+    categories = session.query(Category).all()
+    categories_list = []
+    for category in categories:
+        list = []
+        items = session.query(Item).filter_by(category_id=category.id)
+        for item in items:
+            list.append({"title" : item.name, "id" : item.id, "description" : item.description,
+                         "cat_id": item.category_id})
+        categories_list.append({"id": category.id, "name": category.name, "Items": list})
+        # categories_list.append({"Items": list})
+    # items = session.query(Item).all()
+    return jsonify({"Category":categories_list})
+    # return "All items as JSON"
 
 
 @app.route('/category/JSON/items/<int:category_id>')
@@ -311,21 +327,30 @@ def showLatest():
 
 @app.route('/catalog/<string:category_name>/items')
 def showItems(category_name):
+    """
+
+    :param category_name:
+    :return:
+    """
+    categories = session.query(Category).all()
     category = session.query(Category).filter_by(name=category_name).one()
     items = session.query(Item).filter_by(category_id=category.id).all()
     # TODO: complete function
-    return "Show items in category"
+    return render_template('publicitems.html', category=category, categories=categories, items=items)
+    # return "Show items in category"
 
 
 @app.route('/catalog/<string:category_name>/<string:item_name>')
 def showItem(category_name, item_name):
+    categories = session.query(Category).all()
     category = session.query(Category).filter_by(name=category_name).one()
-    item = session.query(Item).filter_by(name=item_name).one()
+    item = session.query(Item).filter_by(name=item_name, category_id=category.id).one()
     creator = getUserInfo(item.user_id)
-    if 'username' not in login_session or creator.id != login_session['user_id']:
-        return "Show one item in category"
-    else:
-        return render_template()
+    return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
+    # if 'username' not in login_session or creator.id != login_session['user_id']:
+    #     return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
+    # else:
+    #     return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
 
 
 @app.route('/catalog/add', methods=['GET', 'POST'])
@@ -337,23 +362,70 @@ def addItem():
     if 'username' not in login_session:
         return redirect('/login')
     if request.method == 'POST':
-        newItem = Item(name = request.form['name'], user_id = login_session['user_id'])
+        category = session.query(Category).filter_by(name=request.form['category']).one()
+        newItem = Item(name = request.form['title'], user_id = login_session['user_id'],
+                       description=request.form['description'], category_id=category.id, category=category)
         session.add(newItem)
         session.commit()
         flash('New item %s successfully created' % newItem.name)
-        return redirect('showLatest')
+        return redirect(url_for('showLatest'))
     else:
-        return "Add item page."
+        # return "Add item page."
+        categories = session.query(Category).all()
+        return render_template('add_item.html', categories=categories)
 
 
-@app.route('/catalog/<string:item_name>/edit')
+@app.route('/catalog/<string:item_name>/edit', methods=['GET', 'POST'])
 def editItem(item_name):
-    return "Edit item page"
+    """
+
+    :param item_name:
+    :return:
+    """
+    if 'username' not in login_session:
+        return redirect('/login')
+    editedItem = session.query(Item).filter_by(name=item_name).one()
+    categories = session.query(Category).all()
+    if login_session['user_id'] != editedItem.user_id:
+        return "<script>function myFunction() {alert('You are not authorized to edit this item. Please create your own.');}</script><body onload='myFunction()''>"
+    if request.method == 'POST':
+        if request.form['title']:
+            editedItem.name = request.form['title']
+        if request.form['description']:
+            editedItem.description = request.form['description']
+        if request.form['category']:
+            category = session.query(Category).filter_by(name=request.form['category']).one()
+            editedItem.category_id = category.id
+            editedItem.category = category
+        session.add(editedItem)
+        session.commit()
+        flash('Item edited successfully!')
+        return redirect(url_for('showLatest'))
+    else:
+        return render_template('edit_item.html', categories=categories, item=editedItem)
+    # return "Edit item page"
 
 
-@app.route('/catalog/<string:item_name>/delete')
+@app.route('/catalog/<string:item_name>/delete' , methods=['GET', 'POST'])
 def deleteItem(item_name):
-    return "Delete item page"
+    """
+
+    :param item_name:
+    :return:
+    """
+    if 'username' not in login_session:
+        return redirect('/login')
+    deletedItem = session.query(Item).filter_by(name=item_name).one()
+    if login_session['user_id'] != deletedItem.user_id:
+        return "<script>function myFunction() {alert('You are not authorized to edit this item. Please create your own.');}</script><body onload='myFunction()''>"
+    if request.method == 'POST':
+        session.delete(deletedItem)
+        session.commit()
+        flash('Item deleted successfully!')
+        return redirect(url_for('showLatest'))
+    else:
+        return render_template('delete_item.html', item=deletedItem)
+    # return "Delete item page"
 
 
 if __name__ == '__main__':
