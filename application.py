@@ -1,7 +1,10 @@
 import random, string, httplib2, json, requests
 
+from functools import wraps
+
 from flask import Flask, render_template, request, redirect, jsonify, url_for, flash, make_response
 from flask import session as login_session
+from flask.ext.seasurf import SeaSurf
 
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
@@ -11,6 +14,7 @@ from oauth2client.client import flow_from_clientsecrets, FlowExchangeError, Acce
 from database_setup import Base, User, Category, Item
 
 app = Flask(__name__)
+csrf = SeaSurf(app)
 
 # Connect to database and create database session
 engine = create_engine('sqlite:///itemcatalog.db')
@@ -62,7 +66,7 @@ def showLogin():
     login_session['state'] = state
     return render_template('login.html', STATE=state)
 
-
+@csrf.exempt
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     """
@@ -148,6 +152,7 @@ def gconnect():
     return output
 
 
+@csrf.exempt
 @app.route('/gdisconnect')
 def gdisconnect():
     """
@@ -176,6 +181,7 @@ def gdisconnect():
         return response
 
 
+@csrf.exempt
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
     """
@@ -228,6 +234,7 @@ def fbconnect():
     return output
 
 
+@csrf.exempt
 @app.route('/fbdisconnect')
 def fbdisconnect():
     """
@@ -239,6 +246,7 @@ def fbdisconnect():
     result = h.request(url, 'DELETE')[1]
 
 
+@csrf.exempt
 @app.route('/disconnect')
 def disconnect():
     """
@@ -284,6 +292,18 @@ def itemsJSON():
     return jsonify({"Category":categories_list})
 
 
+# Login required decorator
+# Check if user logged in else - redirect to login page
+def login_requred(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in login_session:
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+
 # Main CRUD functions
 
 @app.route('/')
@@ -299,20 +319,20 @@ def showLatest():
         return render_template('loggedindex.html', categories=categories, items=items)
 
 
-@app.route('/catalog/<string:category_name>/items')
-def showItems(category_name):
+@app.route('/catalog/<int:category_id>/items')
+def showItems(category_id):
     """
     Show item in specific category
     :param category_name: name of category
     """
     categories = session.query(Category).all()
-    category = session.query(Category).filter_by(name=category_name).one()
+    category = session.query(Category).filter_by(id=category_id).one()
     items = session.query(Item).filter_by(category_id=category.id).all()
     return render_template('publicitems.html', category=category, categories=categories, items=items)
 
 
-@app.route('/catalog/<string:category_name>/<string:item_name>')
-def showItem(category_name, item_name):
+@app.route('/catalog/<string:category_name>/<int:item_id>')
+def showItem(category_name, item_id):
     """
     Return one item in category.
     :param category_name: category name
@@ -320,40 +340,47 @@ def showItem(category_name, item_name):
     """
     categories = session.query(Category).all()
     category = session.query(Category).filter_by(name=category_name).one()
-    item = session.query(Item).filter_by(name=item_name, category_id=category.id).one()
+    item = session.query(Item).filter_by(id=item_id, category_id=category.id).one()
     creator = getUserInfo(item.user_id)
     return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
 
 
 @app.route('/catalog/add', methods=['GET', 'POST'])
+@login_requred
 def addItem():
     """
     Create new item
     """
-    if 'username' not in login_session:
-        return redirect('/login')
+    # if 'username' not in login_session:
+    #     return redirect('/login')
     if request.method == 'POST':
         category = session.query(Category).filter_by(name=request.form['category']).one()
-        newItem = Item(name = request.form['title'], user_id = login_session['user_id'],
-                       description=request.form['description'], category_id=category.id, category=category)
-        session.add(newItem)
-        session.commit()
-        flash('New item %s successfully created' % newItem.name)
-        return redirect(url_for('showLatest'))
+        old_items = session.query(Item).filter_by(category_id=category.id, name=request.form['title']).all()
+        if old_items == []:
+            new_item = Item(name = request.form['title'], user_id = login_session['user_id'],
+                            description=request.form['description'], category_id=category.id, category=category)
+            session.add(new_item)
+            session.commit()
+            flash('New item %s successfully created' % new_item.name)
+            return redirect(url_for('showLatest'))
+        else:
+            flash('Item with this name %s exist. Try again!' % request.form['title'])
+            return redirect(url_for('showLatest'))
     else:
         categories = session.query(Category).all()
         return render_template('add_item.html', categories=categories)
 
 
-@app.route('/catalog/<string:item_name>/edit', methods=['GET', 'POST'])
-def editItem(item_name):
+@app.route('/catalog/<int:item_id>/edit', methods=['GET', 'POST'])
+@login_requred
+def editItem(item_id):
     """
     Edit item page. Show edit item apge and process editing.
     :param item_name: name of item to edit
     """
-    if 'username' not in login_session:
-        return redirect('/login')
-    editedItem = session.query(Item).filter_by(name=item_name).one()
+    # if 'username' not in login_session:
+    #     return redirect('/login')
+    editedItem = session.query(Item).filter_by(id=item_id).one()
     categories = session.query(Category).all()
     if login_session['user_id'] != editedItem.user_id:
         return "<script>function myFunction() {alert('You are not authorized to edit this item. Please create your own.');}</script><body onload='myFunction()''>"
@@ -374,15 +401,16 @@ def editItem(item_name):
         return render_template('edit_item.html', categories=categories, item=editedItem)
 
 
-@app.route('/catalog/<string:item_name>/delete' , methods=['GET', 'POST'])
-def deleteItem(item_name):
+@app.route('/catalog/<int:item_id>/delete' , methods=['GET', 'POST'])
+@login_requred
+def deleteItem(item_id):
     """
     Delete item page. End process deleting of item.
     :param item_name: name of item to delete
     """
-    if 'username' not in login_session:
-        return redirect('/login')
-    deletedItems = session.query(Item).filter_by(name=item_name).one()
+    # if 'username' not in login_session:
+    #     return redirect('/login')
+    deletedItems = session.query(Item).filter_by(id=item_id).one()
     if login_session['user_id'] != deletedItems.user_id:
         return "<script>function myFunction() {alert('You are not authorized to edit this item. Please create your own.');}</script><body onload='myFunction()''>"
     if request.method == 'POST':

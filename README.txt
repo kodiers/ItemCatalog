@@ -7,6 +7,7 @@ Requirements:
 3. sqlalchemy 1.0.4
 4. oauth2client 1.4.7
 5. httlib2 0.9
+6. Flask-SeaSurf 0.2.0
 
 FILES IN PACKAGE:
 application.py -- python script with flask main application
@@ -37,8 +38,24 @@ STEPS:
 5. Web interface can be accessed by http://localhost:8000 from local machine
 6. That's all :)
 
+RUN ON Vagrant VM:
+1. Copy all files to your vagrant directory in your local machine
+2. start up vagrant VM by running: vagrant up
+3. connect to your vagrant VM: vagrant ssh
+4. Install all packages from requirements section by pip install in your vagrant VM
+5. in your vm in vagrant directory go to application directory (for example: cd /vagrant/ItemCatalog)
+6. App can be accessed by http://localhost:8000 from local machine
+7. For stop application press CTRL+C
+
+
 RESET DATABASE:
 1. delete itemcatalog.db
-2. run initData.py (python initData.py)
+2. run database_setup.py (python database_setup.py)
+3. run initData.py (python initData.py)
+
+
+API ENDPOINT:
+1. Api endpoint can be accessed by http://localhost:8000/category/JSON/items/
+It return items by category in JSON format
 
 ####################################

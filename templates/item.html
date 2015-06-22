@@ -5,7 +5,7 @@
         <div class="col-xs-4">
             <h1>Categories</h1>
             {% for category in categories %}
-                <p><a href="{{ url_for('showItems', category_name=category.name) }}">{{ category.name }}</a></p>
+                <p><a href="{{ url_for('showItems', category_id=category.id) }}">{{ category.name }}</a></p>
             {% endfor %}
         </div>
         <div class="col-xs-8">
@@ -21,7 +21,7 @@
             {% if creator.id == session['user_id'] %}
                 <div class="row">
                     <div class="col-xs-12">
-                        <a href="{{ url_for('editItem', item_name=item.name) }}">Edit item</a> | <a href="{{ url_for('deleteItem', item_name=item.name) }}">Delete item</a>
+                        <a href="{{ url_for('editItem', item_id=item.id) }}">Edit item</a> | <a href="{{ url_for('deleteItem', item_id=item.id) }}">Delete item</a>
                     </div>
                 </div>
             {% endif %}
