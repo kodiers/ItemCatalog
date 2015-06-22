@@ -1,3 +1,11 @@
+body {
+    background-color: #999999;
+}
+
+.items{
+    background-color: #ffffff;
+}
+
 #errors {
     color: red;
 }
@@ -20,4 +28,23 @@
 }
 .pages_h1 {
     color: #001a43;
+}
+
+.category {
+    color: #999999;
+    font-style: italic;
+}
+
+a {
+    color: red;
+}
+
+.cat_list {
+    border-right: 2px solid;
+    border-color: grey;
+}
+
+.flash {
+    color: green;
+    font-style: italic;
 }

@@ -18,6 +18,7 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
+# Load google secrets
 CLIENT_ID = json.loads(open('client_secret.json', 'r').read())['web']['client_id']
 
 # User helper functions
@@ -49,6 +50,7 @@ def getUserID(email):
         return user.id
     except:
         return None
+
 
 # Functions to handle authentication
 @app.route('/login')
@@ -151,7 +153,6 @@ def gdisconnect():
     """
     Revoke user token and reset login_session
     """
-
     # Use AccessTokenCredentials for fix bug in Flask
     credentials = AccessTokenCredentials(login_session['credentials'], 'user-agent-value')
     if credentials is None:
@@ -159,7 +160,7 @@ def gdisconnect():
         response.headers['Content-Type'] = 'application/json'
         return response
 
-    #Execute HTTP GET to revoke token
+    # Execute HTTP GET to revoke token
     access_token = credentials.access_token
     url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' % access_token
     h = httplib2.Http()
@@ -174,11 +175,12 @@ def gdisconnect():
         response.headers['Content-Type'] = 'application/json'
         return response
 
+
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
     """
     Handle AJAX callback from login page
-    :return:
+    And authenticate through Facebook API
     """
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
@@ -230,27 +232,26 @@ def fbconnect():
 def fbdisconnect():
     """
     Revoke user's token if he's logged from through facebook API
-    :return:
     """
     facebook_id = login_session['facebook_id']
     url = 'https://graph.facebook.com/%s/permissions' % (facebook_id)
     h = httplib2.Http()
     result = h.request(url, 'DELETE')[1]
-    return "Logoff facebook oauth"
 
 
 @app.route('/disconnect')
 def disconnect():
     """
     Logout user and delete login_session's objects
-    :return:
     """
     if 'provider' in login_session:
         if login_session['provider'] == 'google':
+            # Disconect from google
             gdisconnect()
             del login_session['gplus_id']
             del login_session['credentials']
         if login_session['provider'] == 'facebook':
+            # Disconnect from facebook
             fbdisconnect()
             del login_session['facebook_id']
         del login_session['username']
@@ -261,25 +262,15 @@ def disconnect():
         return redirect('')
     else:
         flash("You were not logged in to begin with")
-        redirect(url_for('showLatest'))
+        return redirect(url_for('showLatest'))
 
 
 # Functions to JSON API
-@app.route('/category/JSON')
-def categoriesJSON():
-    return "All categories as JSON"
-
-
-@app.route('/category/JSON/<int:category_id>')
-def categoryJSON(category_id):
-    return "JSON category object"
-
 
 @app.route('/category/JSON/items/')
 def itemsJSON():
     """
-
-    :return:
+    Return items and categories as JSON list
     """
     categories = session.query(Category).all()
     categories_list = []
@@ -290,28 +281,11 @@ def itemsJSON():
             list.append({"title" : item.name, "id" : item.id, "description" : item.description,
                          "cat_id": item.category_id})
         categories_list.append({"id": category.id, "name": category.name, "Items": list})
-        # categories_list.append({"Items": list})
-    # items = session.query(Item).all()
     return jsonify({"Category":categories_list})
-    # return "All items as JSON"
-
-
-@app.route('/category/JSON/items/<int:category_id>')
-def itemsCategoryJSON(category_id):
-    return "All items in category as JSON"
-
-
-@app.route('/category/JSON/items/<int:category_id>/<int:item_id>')
-def itemInCategoryJSON(category_id, item_id):
-    return "Specific item in category as JSON"
-
-
-@app.route('/catalog.json')
-def allCatalogJSON():
-    return "Show items and categories as json"
 
 
 # Main CRUD functions
+
 @app.route('/')
 def showLatest():
     """
@@ -328,36 +302,33 @@ def showLatest():
 @app.route('/catalog/<string:category_name>/items')
 def showItems(category_name):
     """
-
-    :param category_name:
-    :return:
+    Show item in specific category
+    :param category_name: name of category
     """
     categories = session.query(Category).all()
     category = session.query(Category).filter_by(name=category_name).one()
     items = session.query(Item).filter_by(category_id=category.id).all()
-    # TODO: complete function
     return render_template('publicitems.html', category=category, categories=categories, items=items)
-    # return "Show items in category"
 
 
 @app.route('/catalog/<string:category_name>/<string:item_name>')
 def showItem(category_name, item_name):
+    """
+    Return one item in category.
+    :param category_name: category name
+    :param item_name: item name
+    """
     categories = session.query(Category).all()
     category = session.query(Category).filter_by(name=category_name).one()
     item = session.query(Item).filter_by(name=item_name, category_id=category.id).one()
     creator = getUserInfo(item.user_id)
     return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
-    # if 'username' not in login_session or creator.id != login_session['user_id']:
-    #     return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
-    # else:
-    #     return render_template('item.html', category=category, categories=categories, item=item, creator=creator)
 
 
 @app.route('/catalog/add', methods=['GET', 'POST'])
 def addItem():
     """
     Create new item
-    :return:
     """
     if 'username' not in login_session:
         return redirect('/login')
@@ -370,7 +341,6 @@ def addItem():
         flash('New item %s successfully created' % newItem.name)
         return redirect(url_for('showLatest'))
     else:
-        # return "Add item page."
         categories = session.query(Category).all()
         return render_template('add_item.html', categories=categories)
 
@@ -378,9 +348,8 @@ def addItem():
 @app.route('/catalog/<string:item_name>/edit', methods=['GET', 'POST'])
 def editItem(item_name):
     """
-
-    :param item_name:
-    :return:
+    Edit item page. Show edit item apge and process editing.
+    :param item_name: name of item to edit
     """
     if 'username' not in login_session:
         return redirect('/login')
@@ -403,29 +372,26 @@ def editItem(item_name):
         return redirect(url_for('showLatest'))
     else:
         return render_template('edit_item.html', categories=categories, item=editedItem)
-    # return "Edit item page"
 
 
 @app.route('/catalog/<string:item_name>/delete' , methods=['GET', 'POST'])
 def deleteItem(item_name):
     """
-
-    :param item_name:
-    :return:
+    Delete item page. End process deleting of item.
+    :param item_name: name of item to delete
     """
     if 'username' not in login_session:
         return redirect('/login')
-    deletedItem = session.query(Item).filter_by(name=item_name).one()
-    if login_session['user_id'] != deletedItem.user_id:
+    deletedItems = session.query(Item).filter_by(name=item_name).one()
+    if login_session['user_id'] != deletedItems.user_id:
         return "<script>function myFunction() {alert('You are not authorized to edit this item. Please create your own.');}</script><body onload='myFunction()''>"
     if request.method == 'POST':
-        session.delete(deletedItem)
+        session.delete(deletedItems)
         session.commit()
         flash('Item deleted successfully!')
         return redirect(url_for('showLatest'))
     else:
-        return render_template('delete_item.html', item=deletedItem)
-    # return "Delete item page"
+        return render_template('delete_item.html', item=deletedItems)
 
 
 if __name__ == '__main__':
